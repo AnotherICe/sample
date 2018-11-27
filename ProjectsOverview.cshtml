@@ -1,0 +1,310 @@
+﻿@using EY.Fox.Ui.Mvc5.Localization
+@using EY.Fox.Ui.Mvc5.ViewModels
+@using Newtonsoft.Json
+@model StartPageViewModel
+@{
+	ViewBag.Title = StartPageLocalization.Title;
+
+	var projectData = Model.ProjectsTab.Reports.Select(x =>
+	{
+		var reportPeriod = Model.ProjectsTab.ReportPeriods.First(z => z.Id == x.ReportPeriod.Id);
+		var company = Model.ProjectsTab.Companies.First(z => z.Id == x.Company.Id);
+		var project = company.Project == null ? null : Model.ProjectsTab.Projects.FirstOrDefault(z => z.Id == company.Project.Id);
+
+		return new
+		{
+			ProjectId = project == null ? (int?) null : project.Id,
+			CompanyName = company.Name,
+			ReportPeriodId = reportPeriod.Id,
+			LinkToCompany = Url.Action("Details", "MyCompany", new { company.Id }),
+			x.CrsStatus,
+			x.FatcaStatus
+		};
+	});
+	var schemaData = Model.SchemasTab.Schemas.Select(x =>
+	{
+		var country = Model.SchemasTab.Countries.First(z => z.Code == x.CountryCode);
+		return new
+		{
+			x.SchemaName,
+			ReportType = x.ReportType.ToString().ToUpper(),
+			Country = country,
+			UserGuideLink = x.UserGuideLink == null ? null : Url.Content(x.UserGuideLink),
+			Deadline = x.DeadlineProvider == null ? CommonLocalization.Label_NoInformation : x.DeadlineProvider.ByYear(Model.SchemasTab.CurentReportPeriod.GetGenerationYear()).ToShortDateString(),
+			Implemented = x.IsImplemented ? CommonLocalization.Label_Yes : CommonLocalization.Label_No
+		};
+	});
+}
+
+<div class="bg-wrapper">
+</div>
+<div class="portlet light bordered mainPage">
+	<div class="portlet-body">
+		<div class="col-md-12 center-align">
+			<img class="logo-fox" src="~/Assets/App/img/FoxLogo.png" />
+			<h1 class="home-page-header">@string.Format(StartPageLocalization.Welcome_Greeting_0, Model.User.DisplayName)</h1>
+			<span class="home-page-subheader limited">@StartPageLocalization.Welcome_Description</span>
+		</div>
+	</div>
+	<div class="portlet-body">
+		<div class="col-md-12">
+			<div id="project-tabs" class="portlet light bordered">
+				<div class="tabbable-line">
+					<ul class="nav nav-tabs ">
+						<li class="active">
+							<a href="#projects" data-toggle="tab"> @StartPageLocalization.Tab_Projects </a>
+						</li>
+						<li>
+							<a href="#schemas" data-toggle="tab"> @StartPageLocalization.Tab_Schemas </a>
+						</li>
+					</ul>
+				</div>
+				<div class="tab-content">
+					<div class="tab-pane active" id="projects">
+						<div id="projectsGrid"></div>
+					</div>
+					<div class="tab-pane" id="schemas">
+						<div class="home-page-headings">
+							<div class="headings-inner">
+								<h5>@StartPageLocalization.Label_TotalNumberOfSchemas: <span class="home-page-numbers">@Model.SchemasTab.CrsStatistics.NumberOfSchemas/@Model.SchemasTab.FatcaStatistics.NumberOfSchemas</span></h5>
+								<h5>@StartPageLocalization.Label_NumberOfImplementedSchemas: <span class="home-page-numbers">@Model.SchemasTab.CrsStatistics.NumberOfImplemented/@Model.SchemasTab.FatcaStatistics.NumberOfImplemented</span></h5>
+							</div>
+						</div>
+						<div id="schemasGrid"></div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<script id="template-projectsGrid-project" type="text/html">
+	<% if (data.key) { %>
+	<% var project = _.find(projects, {Id: data.key}); %>
+	<a href="@Url.Action("ProjectDetails")?project.id=<%- data.key %>"> @StartPageLocalization.ProjectsGrid_ProjectName: <%- project.Body.Name %></a>
+	<% } else { %>
+	@StartPageLocalization.ProjectsGrid_ProjectName: @StartPageLocalization.NullProjectName
+	<% } %>
+	<i class="fa fa-info-circle project-tooltip" aria-hidden="true" tooltip="<%- data.tooltip %>"></i>
+</script>
+<script id="template-header-column" type="text/html">
+	@StartPageLocalization.ProjectsGrid_Status
+	<i class="fa fa-info-circle" id="status-info" aria-hidden="true"></i>
+</script>
+<script id="template-projectsGrid-linkToCompany" type="text/html">
+	<a href="<%= data.LinkToCompany %>"><%- data.CompanyName %></a>
+</script>
+<script id="template-projectsGrid-status" type="text/html">
+	<%
+	var crsStatus = formatStatus('CRS', data.CrsStatus);
+	var fatcaStatus = formatStatus('FATCA', data.FatcaStatus);
+	%>
+	<%= _.compact([crsStatus, fatcaStatus]).join('<br/>') %>
+</script>
+<script id="template-schemasGrid-linkTouserGuide" type="text/html">
+	<% if (obj.value) { %>
+	<a href="<%= obj.value %>">@StartPageLocalization.SchemasGrid_LinkToUserGuide</a>
+	<% } else { %>
+	@StartPageLocalization.SchemasGrid_NoLinkToUserGuide
+	<% } %>
+</script>
+<script id="template-schemasGrid-statusOverview" type="text/html">
+	<div class="statusoverview">
+		<h4>@StartPageLocalization.StatusOverview_Crs</h4>
+		<p><%= CrsPart %></p>
+		<h4>@StartPageLocalization.StatusOverview_Fatca</h4>
+		<p><%= FatcaPart %></p>
+	</div>
+</script>
+<script id="template-schemasGrid-statusOverviewPart" type="text/html">
+	<p class="status">@StartPageLocalization.StatusOverview_Overdue: <%- Overdue %></p>
+	<p class="status">@StartPageLocalization.StatusOverview_Less15DaysToDeadline: <%- Less15DaysToDeadline %></p>
+	<p class="status">@StartPageLocalization.StatusOverview_Greater15DaysToDeadline: <%- Greater15DaysToDeadline %></p>
+	<p class="status">@StartPageLocalization.StatusOverview_Generated: <%- Generated %></p>
+	<p class="status">@StartPageLocalization.StatusOverview_NotStarted: <%- NotStarted %></p>
+</script>
+<script id="template-schemasGrid-projectStatusOverview" type="text/html">
+	<p class="status">@StartPageLocalization.StatusOverview_Overdue (CRS/FATCA): <%- Crs.Overdue %> / <%- Fatca.Overdue %></p>
+	<p class="status">@StartPageLocalization.StatusOverview_Less15DaysToDeadline (CRS/FATCA): <%- Crs.Less15DaysToDeadline %> / <%- Fatca.Less15DaysToDeadline %></p>
+	<p class="status">@StartPageLocalization.StatusOverview_Greater15DaysToDeadline (CRS/FATCA): <%- Crs.Greater15DaysToDeadline %> / <%- Fatca.Greater15DaysToDeadline %></p>
+	<p class="status">@StartPageLocalization.StatusOverview_Generated (CRS/FATCA): <%- Crs.Generated %> / <%- Fatca.Generated %></p>
+	<p class="status">@StartPageLocalization.StatusOverview_NotStarted (CRS/FATCA): <%- Crs.NotStarted %> / <%- Fatca.NotStarted %></p>
+</script>
+
+<script type="text/javascript">
+	var defaultReportPeriodId = @JsonConvert.SerializeObject(Model.ProjectsTab.ReportPeriods.First(x => x.IsCurrent).Id);
+	var reportPeriodData = @Html.Raw(JsonConvert.SerializeObject(Model.ProjectsTab.ReportPeriods));
+	var projectData = @Html.Raw(JsonConvert.SerializeObject(projectData));
+	var schemaData = @Html.Raw(JsonConvert.SerializeObject(schemaData));
+	var projects = @Html.Raw(JsonConvert.SerializeObject(Model.ProjectsTab.Projects));
+
+	function formatStatusText(status) {
+		var notStartedStatus = @((int)StartPageProjectCompanyReportStatus.NotStarted);
+		var generatedStatus = @((int)StartPageProjectCompanyReportStatus.Generated);
+		var overdueStatus = @((int)StartPageProjectCompanyReportStatus.Overdue);
+		var less15DaysToDeadlineStatus = @((int)StartPageProjectCompanyReportStatus.Less15DaysToDeadline);
+		var greater15DaysToDeadlineStatus = @((int)StartPageProjectCompanyReportStatus.Greater15DaysToDeadline);
+		var notAvailableStatus = @((int)StartPageProjectCompanyReportStatus.NotAvailable);
+
+		if (status.Status === notAvailableStatus) {
+			return '<i class="fa fa-circle gray"></i>' + '@StartPageLocalization.Status_NotAvailable';
+		}
+		if (status.Status === generatedStatus) {
+			return '<i class="fa fa-circle green"></i>' + '@StartPageLocalization.Status_Generated';
+		}
+		if (status.Status === notStartedStatus) {
+			return '<i class="fa fa-circle gray"></i>' + '@StartPageLocalization.Status_NotStatrted';
+		}
+		if (status.Status === overdueStatus) {
+			return '<i class="fa fa-exclamation-circle red"></i>' + '@ReportLocalization.Label_DeadlineFailed';
+		}
+		if (status.Status === less15DaysToDeadlineStatus) {
+			return '<i class="fa fa-circle yellow"></i>' + DevExpress.utils.string.format('@StartPageLocalization.Status_Less15DaysToDeadline_1', status.Days);
+		}
+		if (status.Status === greater15DaysToDeadlineStatus) {
+			return '<i class="fa fa-circle yellow"></i>' + DevExpress.utils.string.format('@StartPageLocalization.Status_Greater15DaysToDeadline_1', status.Days);
+		}
+
+		return '';
+	}
+	function formatStatus(type, status) {
+		var statusText = formatStatusText(status);
+		if (statusText) {
+			return '<span class="label-reporttype">' + type + " : </span>  " + statusText;
+		}
+
+		return '';
+	}
+
+	var statusOverviewTemplate = _.template($('#template-schemasGrid-statusOverview').html());
+	function updateStatusOverview() {
+		var reportPeriodId = $('[name=projectReportPeriod]').parents('.dx-selectbox').dxSelectBox('option', 'value');
+
+		var crsPart = calculateStatusOverviewPart(reportPeriodId, 'CrsStatus');
+		var fatcaPart= calculateStatusOverviewPart(reportPeriodId, 'FatcaStatus');
+
+		var overviewHtml = statusOverviewTemplate({ CrsPart: crsPart, FatcaPart: fatcaPart });
+
+		$('#status-info').attr('tooltip', overviewHtml);
+	}
+
+	var statusOverviewPartTemplate = _.template($('#template-schemasGrid-statusOverviewPart').html());
+	function calculateStatusOverviewPart(reportPeriodId, statusField) {
+		var currentProjects = projectData.filter(function(x) { return x.ReportPeriodId === reportPeriodId });
+		var currentProjectsByStatus = _.groupBy(currentProjects, function(x) {
+			return x[statusField].Status;
+		});
+
+		function extract(status) {
+			var obj = currentProjectsByStatus[status];
+			return obj ? obj.length : 0;
+		}
+
+		return statusOverviewPartTemplate({
+			'NotStarted': extract(@((int)StartPageProjectCompanyReportStatus.NotStarted)),
+			'Generated': extract(@((int)StartPageProjectCompanyReportStatus.Generated)),
+			'Overdue': extract(@((int)StartPageProjectCompanyReportStatus.Overdue)),
+			'Less15DaysToDeadline': extract(@((int)StartPageProjectCompanyReportStatus.Less15DaysToDeadline)),
+			'Greater15DaysToDeadline': extract(@((int)StartPageProjectCompanyReportStatus.Greater15DaysToDeadline))
+		});
+	}
+
+	var projectStatusOverviewTemplate = _.template($('#template-schemasGrid-projectStatusOverview').html());
+	function calculateProjectStatusOverview(projectId) {
+		var reportPeriodId = $('[name=projectReportPeriod]').parents('.dx-selectbox').dxSelectBox('option', 'value') || defaultReportPeriodId;
+		return projectStatusOverviewTemplate({
+			Crs: calculateProjectStatusOverviewPart(reportPeriodId, projectId, 'CrsStatus'),
+			Fatca: calculateProjectStatusOverviewPart(reportPeriodId, projectId, 'FatcaStatus')
+		});
+	}
+	function calculateProjectStatusOverviewPart(reportPeriodId, projectId, statusField) {
+		var currentProjects = projectData.filter(function(x) { return x.ReportPeriodId === reportPeriodId && x.ProjectId === projectId});
+		var currentProjectsByStatus = _.groupBy(currentProjects, function(x) {
+			return x[statusField].Status;
+		});
+
+		function extract(status) {
+			var obj = currentProjectsByStatus[status];
+			return obj ? obj.length : 0;
+		}
+
+		return {
+			'NotStarted': extract(@((int)StartPageProjectCompanyReportStatus.NotStarted)),
+			'Generated': extract(@((int)StartPageProjectCompanyReportStatus.Generated)),
+			'Overdue': extract(@((int)StartPageProjectCompanyReportStatus.Overdue)),
+			'Less15DaysToDeadline': extract(@((int)StartPageProjectCompanyReportStatus.Less15DaysToDeadline)),
+			'Greater15DaysToDeadline': extract(@((int)StartPageProjectCompanyReportStatus.Greater15DaysToDeadline))
+		};
+	}
+
+	$(function() {
+		$('#projectsGrid').dxDataGrid({
+			dataSource: projectData,
+			grouping: {
+				autoExpandAll: true
+			},
+			paging: {
+				pageSize: 10
+			},
+			groupPanel: {
+				visible: true
+			},
+			columns: [
+				{ caption: '@StartPageLocalization.ProjectsGrid_ProjectName', dataField: "ProjectId", groupIndex: 0, groupCellTemplate: $('#template-projectsGrid-project') },
+				{ caption: "@StartPageLocalization.ProjectsGrid_CompanyName", dataField: "CompanyName", cellTemplate: $('#template-projectsGrid-linkToCompany') },
+				{ caption: "@StartPageLocalization.ProjectsGrid_Status",  headerCellTemplate: $('#template-header-column'), cellTemplate: $('#template-projectsGrid-status'), cssClass: 'status-overview' }
+			],
+			onContentReady: function(contentReadyEvent) {
+				var container = contentReadyEvent.element.find('.dx-datagrid-header-panel .dx-toolbar-after');
+				if (!container.data('content-ready-processed')) {
+					$('<div>').dxSelectBox({
+						dataSource: reportPeriodData,
+						value: defaultReportPeriodId,
+						id: 'projectReportPeriod',
+						name: 'projectReportPeriod',
+						valueExpr: 'Id',
+						displayExpr: '@(CommonLocalization.DisplayPropertyName)',
+						onValueChanged: function (selected) {
+							contentReadyEvent.component.filter(['ReportPeriodId', '=', selected.value]);
+						},
+						width: 300,
+						onContentReady: function(e) {
+							e.element.find(".dx-list-item").css("text-align", "right");
+						}
+					}).appendTo(container);
+
+					container.data('content-ready-processed', true);
+				}
+
+				updateStatusOverview();
+			},
+			onRowPrepared: function (e) {
+				if (e.rowType === 'group') {
+					var tooltip = calculateProjectStatusOverview(e.data.key);
+					e.data.tooltip = tooltip;
+				}
+			}
+		});
+
+		$('#schemasGrid').dxDataGrid({
+			dataSource: schemaData,
+			paging: {
+				pageSize: 10
+			},
+			filterRow: {
+				visible: true
+			},
+			columns: [
+				{ caption: '@StartPageLocalization.SchemasGrid_Country', dataField: "Country.@(CommonLocalization.DisplayPropertyName)", filterOperations: ['contains']},
+				{ caption: "@StartPageLocalization.SchemasGrid_ReportyType", dataField: "ReportType", allowFiltering: false },
+				{ caption: "@StartPageLocalization.SchemasGrid_Schema", dataField: "SchemaName", allowFiltering: false },
+				{ caption: "@StartPageLocalization.SchemasGrid_UserGuideLink", dataField: "UserGuideLink", cellTemplate: $('#template-schemasGrid-linkTouserGuide'), allowFiltering: false },
+				{ caption: "@StartPageLocalization.SchemasGrid_Deadline", dataField: "Deadline", allowFiltering: false },
+				{ caption: '@StartPageLocalization.SchemasGrid_Implemented', dataField: "Implemented", allowFiltering: false }
+			]
+		});
+
+		$('#projectsGrid').dxDataGrid('instance').filter(['ReportPeriodId', '=', defaultReportPeriodId]);
+	});
+
+</script>

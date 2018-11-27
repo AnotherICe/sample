@@ -1,0 +1,296 @@
+﻿@using EY.Fox.Domain.Localization
+@using EY.Fox.Ui.Mvc5.Localization
+@using EY.Fox.Ui.Mvc5.ViewModels
+@using Newtonsoft.Json
+@model StartProjectDetailsViewModel
+@{
+	ViewBag.Title = StartPageLocalization.Title;
+}
+
+<div id="dashboardWidgets">
+	<div id="loadingPanel"></div>
+	<div class="col-md-8 mainWidgets">
+		<div class="mainWidgetsWrapper">
+			<div class="dx-field">
+				<div class="dx-field-label">@StartPageLocalization.Label_ReportPeriodFilter</div>
+				<div class="dx-field-value">
+					<div id="reportPeriodFilter"></div>
+				</div>
+			</div>
+			<div class="dx-field">
+				<div class="dx-field-label">@StartPageLocalization.Label_CompanyFilter</div>
+				<div class="dx-field-value">
+					<div id="companyFilter"></div>
+				</div>
+			</div>
+		</div>
+		<div id="companySchemaDetails">
+			<ul class="nav nav-tabs ">
+				<li class="active">
+					<a href="#companySchemaDetails-crs" data-toggle="tab"> CRS </a>
+				</li>
+				<li>
+					<a href="#companySchemaDetails-fatca" data-toggle="tab">FATCA </a>
+				</li>
+			</ul>
+			<div class="tab-content">
+				<div class="tab-pane active" id="companySchemaDetails-crs"></div>
+				<div class="tab-pane" id="companySchemaDetails-fatca"></div>
+			</div>
+		</div>
+		<div id="schemaGraphicsContainer">
+			<ul class="nav nav-tabs ">
+				<li class="active">
+					<a href="#schemaGraphicsContainer-crs" data-toggle="tab">CRS</a>
+				</li>
+				<li>
+					<a href="#schemaGraphicsContainer-fatca" data-toggle="tab">FATCA</a>
+				</li>
+			</ul>
+			<div class="tab-content">
+				<div class="tab-pane active" id="schemaGraphicsContainer-crs"></div>
+				<div class="tab-pane" id="schemaGraphicsContainer-fatca"></div>
+			</div>
+		</div>
+	</div>
+	<div class="col-md-4 sideWidgets">
+		<div class="deadline-btn">
+			<h3>
+				<a href="#" data-toggle="modal">@StartPageLocalization.Label_Deadlines</a>
+			</h3>
+			<a href="#" data-toggle="modal"><span>@StartPageLocalization.Label_Deadlines_Description</span></a>
+		</div>
+		<div class="companyInfo">
+			<div id="companyName" class="widgetHeading"></div>
+			<div class="widgetBody">
+				<div id="reportData-crs"></div>
+				<div id="reportData-fatca"></div>
+			</div>
+		</div>
+		<div id="companyGiin" class="giinWidget"></div>
+		<div id="companyUsers" class="teamMember"></div>
+	</div>
+</div>
+
+<div id="deadline-popup">
+</div>
+
+@section Scripts
+{
+	@Scripts.Render("~/vectormap/world")
+	<script type="text/html" id="template-companyusers">
+		<div class="widgetHeading">
+			<h3>@StartPageLocalization.Label_TeamMembers</h3>
+		</div>
+		<div class="widgetBody">
+			<% for(var iUser = 0; iUser < users.length; iUser++) { %>
+			<% var user = users[iUser]; %>
+			<div class="teamMember">
+				<h4 class="memberSignature">
+					<%- _.map(user.DisplayName.split(' '), function(x){return x[0].toUpperCase()}).join('') %>
+				</h4>
+				<p class="memberName">
+					<a href="@Url.Action("Profile", "User")?login=<%- user.Login %>" target="_blank">
+						<%- user.DisplayName %>
+					</a>
+					<span class="memberMail"><%- user.ContactEmail %></span>
+				</p>
+			</div>
+			<% } %>
+		</div>
+	</script>
+	@*<script type="text/html" id="template-reportdata">
+			<div class="reportStatus">
+				<h4>
+					<span class="reportstatusicon">
+						<span><%- reportType.toUpperCase() %></span>
+						<% if (reportData) { %>
+						<i class="fa fa-circle reportstatusicon <%- reportData.Status.StatusString.toLowerCase() %>"></i>
+						<% } %>
+					</span>
+				</h4>
+				<ul class="properties">
+					<% if (reportData) { %>
+					<li>@StartPageLocalization.Label_DaysToDeadline: <%- reportData.Status.Days != null ? (reportData.Status.Days > 0 ? reportData.Status.Days : @ReportLocalization.Label_DeadlineFailed) : "N/A" %></li>
+					<li>@StartPageLocalization.Label_ReportStatus: <%- !!reportData.Report.GeneratedTimestamp ? "@ReportLocalization.Label_Status_Generated" : "@ReportLocalization.Label_Status_Draft" %></li>
+					<li>@StartPageLocalization.Label_AmountOfClientEntries: <%- reportData.Statistics.NumberOfClients %></li>
+					<li>@StartPageLocalization.Label_AmountOfControllingEntries: <%- reportData.Statistics.NumberOfControllingIdentities %></li>
+					<li>@StartPageLocalization.Label_AmountOfPolledEntries: <%- reportData.Statistics.NumberOfPolledClients %></li>
+					<li>@StartPageLocalization.Label_AmountOfAccounts: <%- reportData.Statistics.NumberOfAccounts %></li>
+					<% } else { %>
+					<li>@StartPageLocalization.Status_NotStatrted</li>
+					<% } %>
+				</ul>
+			</div>
+		</script>*@
+
+	<script type="text/html" id="template-reportdata">
+		<div class="reportStatus">
+			<h4>
+				<span class="reportstatusicon">
+					<span><%- reportType.toUpperCase() %></span>
+					<% if (reportData) { %>
+					@* ReSharper disable UnknownCssClass *@
+					<i class="fa fa-circle reportstatusicon <%- reportData.Status.StatusString.toLowerCase() %>"></i>
+					@* ReSharper restore UnknownCssClass *@
+					<% } %>
+				</span>
+			</h4>
+			<ul class="properties">
+				<% if (reportData) { %>
+				<li>@StartPageLocalization.Label_DaysToDeadline: <%- reportData.Status.Days != null ? (reportData.Status.Days > 0 ? reportData.Status.Days : "@ReportLocalization.Label_DeadlineFailed") : "N/A" %></li>
+				<li>@StartPageLocalization.Label_ReportStatus: <%- !!reportData.Report.GeneratedTimestamp ? "@ReportLocalization.Label_Status_Generated" : "@ReportLocalization.Label_Status_Draft" %></li>
+				<li>@StartPageLocalization.Label_AmountOfClientEntries: <%- reportData.Statistics.NumberOfClients %></li>
+				<li>@StartPageLocalization.Label_AmountOfControllingEntries: <%- reportData.Statistics.NumberOfControllingIdentities %></li>
+				<li>@StartPageLocalization.Label_AmountOfPolledEntries: <%- reportData.Statistics.NumberOfPolledClients %></li>
+				<li>@StartPageLocalization.Label_AmountOfAccounts: <%- reportData.Statistics.NumberOfAccounts %></li>
+				<% } else { %>
+				<li>@StartPageLocalization.Status_NotStatrted</li>
+				<% } %>
+			</ul>
+		</div>
+	</script>
+
+	<script type="text/html" id="template-companyname">
+		<h3><%- Name %></h3>
+	</script>
+	<script type="text/html" id="template-companygiin">
+		<div>
+			<h4 class="giinHead">GIIN</h4>
+			<span><%- GlobalIntermediaryIdentificationNumber %></span>
+		</div>
+	</script>
+	<script type="text/html" id="template-byresidencevectormaptooltip">
+		<b><%- country['@CountryLocalization.DisplayPropertyName'] %></b>
+		<br />
+		@StartPageLocalization.Label_AmountOfPersonsClients: <%- data.AmountOfPersonsClients %>
+		<br />
+		@StartPageLocalization.Label_AmountOfOrganizationClients: <%- data.AmountOfOrganizationClients %>
+	</script>
+	<script type="text/html" id="template-byresidenceaccountcharttooltip">
+		<b><%- country %></b>
+		<br />
+		@StartPageLocalization.Label_AmountOfAccounts: <%- amount %>
+	</script>
+	<script type="text/html" id="template-schemagraphics">
+		<div class="row">
+			<div class="col-md-6">
+				<div class="data">
+					<% if (data) {%>
+					<div id="clientInCountries" class="devMap"></div>
+					<% } else {%>
+					<div class="nodata">@StartPageLocalization.Label_NoInformation</div>
+					<% } %>
+				</div>
+			</div>
+			<div class="col-md-6">
+				<div class="data">
+					<% if (data) {%>
+					<div id="balanceStatistics" class="devMap"></div>
+					<% } else {%>
+					<div class="nodata">@StartPageLocalization.Label_NoInformation</div>
+					<% } %>
+				</div>
+			</div>
+		</div>
+	</script>
+	<script type="text/html" id="template-schemadetails">
+		<div class="data">
+			<div class="row header">
+				<div class="col-md-3 delimeter-right">@StartPageLocalization.SchemasGrid_Schema</div>
+				<div class="col-md-3 delimeter-right">@StartPageLocalization.SchemasGrid_UserGuideLink</div>
+				<div class="col-md-3 delimeter-right">@StartPageLocalization.SchemasGrid_Deadline</div>
+				<div class="col-md-3">@StartPageLocalization.Label_Reports</div>
+			</div>
+			<div class="row">
+				<% if (schema) { %>
+				<div class="col-md-3 delimeter-right"><%- schema.SchemaName %></div>
+				<div class="col-md-3 delimeter-right">
+					<% if (schema.MappedUserGuideLink) { %>
+					<a href="<%= schema.MappedUserGuideLink %>">@StartPageLocalization.SchemasGrid_LinkToUserGuide</a>
+					<% } else { %>
+					@StartPageLocalization.SchemasGrid_NoLinkToUserGuide
+					<% } %>
+				</div>
+				<div class="col-md-3 delimeter-right">
+					<% if (schema.ThisYearDeadline) { %>
+					<%- DevExpress.localization.date.format(new Date(Date.parse(schema.ThisYearDeadline)), 'shortDate') %>
+					<% } else { %>
+					@StartPageLocalization.Label_NoInformation
+					<% } %>
+				</div>
+				<% } else { %>
+				<div class="col-md-3 delimeter-right">@StartPageLocalization.Label_NoInformation</div>
+				<div class="col-md-3 delimeter-right">@StartPageLocalization.Label_NoInformation</div>
+				<div class="col-md-3 delimeter-right">@StartPageLocalization.Label_NoInformation</div>
+				<% } %>
+
+				<% if (report) { %>
+				<div class="col-md-3">
+					<a href="@Url.Action("Details", "MyReport")?report.id=<%- report.Id %>">@StartPageLocalization.Label_LinkToReports</a>
+				</div>
+				<% } else { %>
+				<div class="col-md-3">@StartPageLocalization.Label_NoInformation</div>
+				<% } %>
+			</div>
+		</div>
+	</script>
+	<script type="text/javascript" src="~/Assets/App/scripts/startPage/ProjectDetails.js"></script>
+	<script type="text/javascript">
+		@{
+			var projectDetailsDashboardOptions = new
+			{
+				urls = new {getCompanyDataUrl = Url.Action("ProjectDetailsData")},
+				dataSources = new
+				{
+					reportPeriods = Model.ReportPeriods,
+					companies = Model.Companies,
+					countries = Model.Countries
+				},
+				localization = new
+				{
+					loadingMessage = StartPageLocalization.Message_LoadCompanyData,
+					nameCompanies = StartPageLocalization.Label_CompanyNames,
+					fields = new
+					{
+						reportPeriodDisplayName = CommonLocalization.DisplayPropertyName,
+						countryDisplayName = CountryLocalization.DisplayPropertyName
+					},
+					companyFilterColumns = new
+					{
+						companyName = CompanyStrings.Name,
+						taxIdentityNumber = CompanyStrings.TaxIdentityNumber,
+						residence = CompanyStrings.ResidenceCountry,
+						note = CompanyStrings.Note,
+						crsDeadline = StartPageLocalization.SchemasGrid_CrsDeadline,
+						fatcaDeadline = StartPageLocalization.SchemasGrid_FatcaDeadline,
+					},
+					deadlinesPopup = new
+					{
+						title = StartPageLocalization.Label_Deadlines,
+						companies = CompanyLocalization.Page_Title
+					},
+					byResidencesVectorMap = new
+					{
+						amountOfPerson = StartPageLocalization.Label_AmountOfPersonsClients,
+						amountOfOrganization = StartPageLocalization.Label_AmountOfOrganizationClients
+					},
+					byResidenceAccountChart = new
+					{
+						totalAccountBalance = StartPageLocalization.Label_TotalAccountBalance,
+						amountOfAccounts = StartPageLocalization.Label_AmountOfAccounts
+					},
+
+				},
+				initial = new
+				{
+					reportPeriodId = Model.ReportPeriods.First(x => x.IsCurrent).Id
+				}
+			};
+		}
+
+		$(function () {
+			InitProjectDetailsDashboard(@Html.Raw(JsonConvert.SerializeObject(projectDetailsDashboardOptions)));
+		});
+	</script>
+}
